@@ -23,7 +23,7 @@ export interface GmailApiEmailData {
  */
 export async function fetchGmailEmails(
     supabase: SupabaseClient<Database>,
-    maxResults: number = 100
+    maxResults: number = 200
 ): Promise<GmailApiEmailData[]> {
     console.log("Executing fetchGmailEmails function...");
 

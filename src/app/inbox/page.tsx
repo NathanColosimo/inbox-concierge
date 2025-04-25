@@ -116,7 +116,7 @@ export default async function InboxPage() {
     // --- Step 2: Fetch Latest Emails Directly from Gmail ---
     console.log("Step 2: Fetching latest emails directly from Gmail...");
     try {
-      gmailApiEmails = await fetchGmailEmails(supabase, 100); // Assign to the outer variable
+      gmailApiEmails = await fetchGmailEmails(supabase, 200); // Assign to the outer variable
       console.log(`Fetched ${gmailApiEmails.length} email threads from Gmail API.`);
       allLatestGmailThreadIds = gmailApiEmails.map(g => g.threadId); // Store fetched IDs
     } catch (fetchError) {
