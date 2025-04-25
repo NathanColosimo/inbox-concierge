@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { NextResponse } from 'next/server';
 
 // --- Configuration ---
-const BATCH_SIZE = 10; // Process emails in batches of 10
-const DELAY_BETWEEN_REQUESTS_MS = 300; // Wait 300ms between starting new requests
+const BATCH_SIZE = 15; // Process emails in batches of 10
+const DELAY_BETWEEN_REQUESTS_MS = 100; // Wait 100ms between starting new requests
 
 // --- Input Validation ---
 // Accept full bucket objects now
