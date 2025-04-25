@@ -22,6 +22,7 @@ const classifyRequestSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string(),
+      description: z.string().optional().nullable(),
     })
   ).min(1, "At least one bucket object (with id and name) is required."),
 });
@@ -64,10 +65,6 @@ export async function POST(request: Request) {
   const { emails, buckets } = requestData; // Use 'buckets' array directly
   const emailChunks = chunkArray(emails, BATCH_SIZE);
 
-  // Create helper structures from the buckets array
-  const bucketNames = buckets.map(b => b.name);
-  const bucketNameToIdMap = new Map(buckets.map(b => [b.name, b.id]));
-
   // 2. Initialize OpenRouter Client
   if (!process.env.OPENROUTER_API_KEY) {
       console.error("OPENROUTER_API_KEY environment variable is not set.");
@@ -76,10 +73,20 @@ export async function POST(request: Request) {
   const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
   // 3. Prepare Static Data for LLM
-  // We can create the bucket name enum once, as it's static for the request
-  const BucketNameEnum = z.enum(bucketNames as [string, ...string[]]); // Input schema guarantees at least one
+  // Get bucket names and map for lookup BEFORE formatting the list for the prompt
+  const bucketNamesOnly = buckets.map(b => b.name);
+  const bucketNameToIdMapLookup = new Map(buckets.map(b => [b.name, b.id]));
 
-  const systemPrompt = `You are an expert email classification assistant. Classify **each** of the provided email threads into one of the available buckets: ${bucketNames.join(', ')}. Return an array containing **exactly one** classification object (with 'threadId' and 'bucketName') for **each** email thread ID listed in the user prompt. Ensure the 'threadId' in your output objects matches exactly one of the IDs provided in the prompt for the current batch. Use only the provided bucket names.`; 
+  // Create a formatted string for the bucket list including descriptions
+  const formattedBucketListWithDesc = buckets.map(b => 
+      `${b.name}${b.description ? ` (Description: ${b.description})` : ''}`
+  ).join(', ');
+
+  // Use the bucket names for the Enum
+  const BucketNameEnum = z.enum(bucketNamesOnly as [string, ...string[]]);
+  
+  // Use the formatted list with descriptions in the system prompt
+  const systemPrompt = `You are an expert email classification assistant. Classify **each** of the provided email threads into one of the available buckets. Use the bucket descriptions provided to help you choose the most appropriate category: ${formattedBucketListWithDesc}. Return an array containing **exactly one** classification object (with 'threadId' and 'bucketName') for **each** email thread ID listed in the user prompt. Ensure the 'threadId' in your output objects matches exactly one of the IDs provided in the prompt for the current batch. Use only the provided bucket names.`;
 
   // 4. Process Batches
   const classifications: ClassificationResult = {};
@@ -143,7 +150,7 @@ export async function POST(request: Request) {
                   }
               }
               if (allInputIdsPresent) {
-                   const validBucketNamesSet = new Set(bucketNames);
+                   const validBucketNamesSet = new Set(bucketNamesOnly);
                    let invalidBucketFound = false;
                    for(const result of rawResults) {
                        // Additional check: Zod schema handles this, but good to be explicit
@@ -171,7 +178,7 @@ export async function POST(request: Request) {
               // Type assertion is safe here due to validation
               const bucketName = result.bucketName as string;
               const threadId = result.threadId as string;
-              const bucketId = bucketNameToIdMap.get(bucketName);
+              const bucketId = bucketNameToIdMapLookup.get(bucketName);
 
               if (bucketId) {
                   classifications[threadId] = bucketId; // Store bucket ID

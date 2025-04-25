@@ -221,7 +221,7 @@ export default async function InboxPage() {
   const availableBucketsMapped = fetchedBuckets.map(b => ({ 
       id: b.id, 
       name: b.name, 
-      description: b.description // Add description
+      description: b.description
   }));
 
   console.log(`Passing ${allEmailsForButton.length} total fetched emails to the classification dialog trigger.`);

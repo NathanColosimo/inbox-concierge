@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 // Define the expected props
 // We only need specific fields from the Email for the API call
 type EmailForClassification = Pick<Tables<'emails'>, 'id' | 'subject' | 'sender' | 'preview' | 'bucket_id'>;
-type BucketForApi = Pick<Tables<'buckets'>, 'id' | 'name'>;
+type BucketForApi = Pick<Tables<'buckets'>, 'id' | 'name' | 'description'>;
 
 interface EmailClassifierButtonProps {
   allFetchedEmails: EmailForClassification[];
@@ -88,7 +88,7 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
             sender: e.sender,
             preview: e.preview
         })),
-        // Pass all available buckets for the LLM context
+        // Pass all available buckets including description
         buckets: availableBuckets, 
       };
 

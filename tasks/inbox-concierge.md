@@ -42,7 +42,7 @@ Create a web application demonstrating engineering skills. The app will authenti
 *   [x] Develop Frontend Display
     *   [x] Fetch data from `/api/emails/fetch` on authenticated page load
     *   [x] Implement loading state
-    *   [x] Display fetched emails (unclassified list)
+    *   [x] Display fetched emails (initially with `bucket_id = null`)
 
 **Phase 3: LLM Classification Pipeline**
 
