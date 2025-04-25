@@ -28,14 +28,12 @@ interface SyncActions {
  * @param gmailEmails - Array of email data fetched from the /api/emails/fetch endpoint.
  * @param supabaseEmails - Array of existing email objects from Supabase (only needs 'id').
  * @param userId - The ID of the current user.
- * @param unclassifiedBucketId - The ID of the default 'Uncategorized' bucket, or null.
  * @returns An object containing emails to insert and lists of thread IDs.
  */
 export function prepareSyncActions(
     gmailEmails: GmailApiEmailData[],
     supabaseEmails: SupabaseExistingEmail[],
-    userId: string,
-    unclassifiedBucketId: string | null
+    userId: string
 ): SyncActions {
 
     const supabaseThreadIds = new Set(supabaseEmails.map(e => e.id)); // Use the 'id' field directly
@@ -50,7 +48,7 @@ export function prepareSyncActions(
             emailsToUpsert.push({
                 id: gmailEmail.threadId, // Set the table's primary key 'id' to the Gmail Thread ID
                 user_id: userId,
-                bucket_id: unclassifiedBucketId, // Assign to Uncategorized or null
+                bucket_id: null, // Assign null for newly synced/uncategorized emails
                 subject: gmailEmail.subject,
                 sender: gmailEmail.sender,
                 preview: gmailEmail.preview,

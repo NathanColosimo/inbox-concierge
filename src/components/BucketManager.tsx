@@ -8,7 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Tables } from '@/lib/database.types';
+import { Trash2 } from 'lucide-react';
 
 // Type for buckets received and managed by this component
 // Include description now
@@ -97,6 +108,7 @@ export function BucketManager({ initialBuckets, userId }: BucketManagerProps) {
   const [isCreating, setIsCreating] = useState(false); // Separate state for create form
   const [isLoading, setIsLoading] = useState(false); // Loading state shared by forms
   const [error, setError] = useState<string | null>(null); // Error state shared by forms
+  const [deletingBucketId, setDeletingBucketId] = useState<string | null>(null); // State for delete confirmation
 
   // Derived state: Is any form currently open?
   const isFormOpen = isCreating || editingBucketId !== null;
@@ -175,6 +187,44 @@ export function BucketManager({ initialBuckets, userId }: BucketManagerProps) {
       }
   };
 
+  // Handler to initiate delete process
+  const handleDeleteClick = (bucketId: string) => {
+    setDeletingBucketId(bucketId); // Open confirmation dialog
+  };
+
+  // Handler to confirm and execute deletion
+  const handleConfirmDelete = async () => {
+    if (!deletingBucketId) return;
+
+    setError(null);
+    setIsLoading(true);
+    const supabase = createClient();
+    const bucketIdToDelete = deletingBucketId;
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('buckets')
+        .delete()
+        .eq('id', bucketIdToDelete);
+
+      if (deleteError) throw deleteError;
+
+      // Remove bucket from local state
+      setBuckets(prev => prev.filter(b => b.id !== bucketIdToDelete));
+      console.log("Bucket deleted:", bucketIdToDelete);
+      setDeletingBucketId(null); // Close dialog
+      router.refresh(); // Refresh server data
+
+    } catch (err) {
+      console.error("Error deleting bucket:", err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to delete bucket: ${message}. Check if emails still reference it.`);
+      setDeletingBucketId(null); // Close dialog even on error, show message
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handler to close whichever form is open
   const handleCancelForm = () => {
       setEditingBucketId(null);
@@ -194,9 +244,22 @@ export function BucketManager({ initialBuckets, userId }: BucketManagerProps) {
               <CardTitle className="text-sm font-medium">{bucket.name}</CardTitle>
               {/* Only show Edit button if NO form is open */}
               {!isFormOpen && (
-                  <Button variant="ghost" size="sm" onClick={() => handleEditClick(bucket.id)}>
-                    Edit
-                  </Button>
+                  <div className="flex items-center space-x-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEditClick(bucket.id)} title="Edit Bucket">
+                          <span className="sr-only">Edit {bucket.name}</span>
+                          Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-red-500 hover:text-red-700" 
+                        title="Delete Bucket" 
+                        onClick={() => handleDeleteClick(bucket.id)}
+                      >
+                          <span className="sr-only">Delete {bucket.name}</span>
+                          <Trash2 className="h-4 w-4" /> 
+                      </Button>
+                  </div>
               )}
             </CardHeader>
             <CardContent>
@@ -252,6 +315,30 @@ export function BucketManager({ initialBuckets, userId }: BucketManagerProps) {
       {error && !isFormOpen && (
           <p className="text-red-500 text-sm mt-2">{error}</p>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingBucketId} onOpenChange={(open) => !open && setDeletingBucketId(null)}>
+         <AlertDialogContent>
+            <AlertDialogHeader>
+               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+               <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the
+                  <strong> {buckets.find(b => b.id === deletingBucketId)?.name || 'selected'}</strong> bucket. 
+                  Emails currently in this bucket might become uncategorized (depending on database setup).
+               </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+               <AlertDialogCancel onClick={() => setDeletingBucketId(null)} disabled={isLoading}>Cancel</AlertDialogCancel>
+               <AlertDialogAction 
+                  onClick={handleConfirmDelete} 
+                  disabled={isLoading}
+                  className="bg-red-600 hover:bg-red-700"
+               >
+                  {isLoading ? 'Deleting...' : 'Yes, delete bucket'}
+               </AlertDialogAction>
+            </AlertDialogFooter>
+         </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 

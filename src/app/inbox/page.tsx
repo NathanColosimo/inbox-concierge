@@ -82,7 +82,6 @@ export default async function InboxPage() {
   try {
     // --- Step 1: Fetch/Ensure Buckets ---
     console.log("Step 1: Fetching/Ensuring Buckets...");
-    let unclassifiedBucketId: string | null = null;
     try {
       const { data: currentBucketsData, error: fetchBucketsError } = await supabase
         .from('buckets')
@@ -94,7 +93,7 @@ export default async function InboxPage() {
 
       if (fetchedBuckets.length === 0) {
         console.log("No buckets found, creating defaults...");
-        const defaultNames = ["Important", "Can wait", "Newsletter", "Uncategorized"];
+        const defaultNames = ["Important", "Can wait", "Newsletter"];
         const defaultBucketsToInsert = defaultNames.map(name => ({ user_id: userId, name: name }));
         const { data: insertedBucketsData, error: insertBucketsError } = await supabase
           .from('buckets')
@@ -106,7 +105,6 @@ export default async function InboxPage() {
       } else {
         console.log(`Found ${fetchedBuckets.length} existing buckets.`);
       }
-      unclassifiedBucketId = fetchedBuckets.find(b => b.name === "Uncategorized")?.id || null;
     } catch (error) {
         console.error("Error in Step 1 (Buckets):", error);
         throw new Error(`Failed to load buckets: ${error instanceof Error ? error.message : String(error)}`); // Make bucket errors fatal
@@ -149,8 +147,7 @@ export default async function InboxPage() {
         const { emailsToUpsert } = prepareSyncActions(
             gmailApiEmails,
             existingSupabaseEmails,
-            userId,
-            unclassifiedBucketId
+            userId
         );
 
         // --- Step 5: Upsert Email Threads ---
@@ -209,8 +206,6 @@ export default async function InboxPage() {
 
   // --- Prepare Data for Client Component ---
   console.log("--- Preparing data for classification button ---");
-  // Need unclassifiedBucketId again for filtering (though not filtering here anymore)
-  const unclassifiedBucketId = fetchedBuckets.find(b => b.name === "Uncategorized")?.id || null;
 
   // Map *all* fetched emails to the format needed by the button/dialog
   const allEmailsForButton = finalEmailsForDisplay.map(email => ({
@@ -299,7 +294,7 @@ export default async function InboxPage() {
               {/* Section for Uncategorized emails */}
               {!pageError && (
                   (() => {
-                      const unclassifiedEmails = finalEmailsForDisplay.filter(email => email.bucket_id === unclassifiedBucketId || email.bucket_id === null);
+                      const unclassifiedEmails = finalEmailsForDisplay.filter(email => email.bucket_id === null);
                       if (unclassifiedEmails.length > 0) {
                           return (
                               <div>
