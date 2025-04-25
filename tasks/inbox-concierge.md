@@ -46,18 +46,18 @@ Create a web application demonstrating engineering skills. The app will authenti
 
 **Phase 3: LLM Classification Pipeline**
 
-*   [ ] Set up Vercel AI SDK & LLM Provider API Key (Environment Variable)
-*   [ ] Define Default Buckets (Hardcoded list)
-*   [ ] Create Classification API Route (`/api/emails/classify`)
-    *   [ ] Accept email data and bucket list
-    *   [ ] Design LLM prompt for classification
-    *   [ ] Use Vercel AI SDK (`streamText`/`generateText`) to classify emails
-    *   [ ] Parse LLM responses
-    *   [ ] Return emails with assigned bucket names
+*   [x] Set up Vercel AI SDK & LLM Provider API Key (Environment Variable)
+*   [x] Define Default Buckets (Hardcoded list)
+*   [x] Create Classification API Route (`/api/core/classify`)
+    *   [x] Accept email data and bucket list
+    *   [x] Design LLM prompt for classification
+    *   [x] Use Vercel AI SDK (`generateObject`) to classify emails
+    *   [x] Parse LLM responses
+    *   [x] Return emails with assigned bucket names
 *   [ ] Integrate Classification into Frontend
-    *   [ ] Call `/api/emails/classify` after fetching emails
-    *   [ ] Update UI state to group emails by bucket
-    *   [ ] Render emails grouped under bucket headings
+    *   [ ] Call `/api/core/classify` after fetching emails
+    *   [ ] Update UI state to group emails by bucket (Update DB based on API response)
+    *   [ ] Render emails grouped under bucket headings (Existing logic should work post-DB update)
 
 **Phase 4: Custom Buckets & Re-classification**
 
