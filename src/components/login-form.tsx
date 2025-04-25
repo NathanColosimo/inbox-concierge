@@ -32,6 +32,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
             'https://www.googleapis.com/auth/userinfo.profile',
             'https://www.googleapis.com/auth/gmail.readonly'
           ].join(' '),
+          redirectTo: `${window.location.origin}/auth/oauth`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

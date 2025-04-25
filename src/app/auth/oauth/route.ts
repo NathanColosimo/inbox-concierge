@@ -8,31 +8,23 @@ export async function GET(request: Request) {
   // if "next" is in param, use it as the redirect URL, otherwise default to /inbox
   const next = searchParams.get('next') ?? '/inbox'
 
-  // Determine the correct base URL for redirection
-  const siteUrl = process.env.NODE_ENV === 'development'
-    ? origin // Use localhost origin in development (e.g., http://localhost:3000)
-    : process.env.VERCEL_PROJECT_PRODUCTION_URL // Use Vercel deployment URL in production
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` // Prepend https for Vercel URL
-      : origin; // Fallback to origin (less ideal in prod, but safe)
-
   if (code) {
     const supabase = await createClient()
-    console.log(`OAuth Callback: Attempting code exchange for code starting with ${code.substring(0, 5)}...`);
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-
     if (!error) {
-      console.log(`OAuth Callback: Code exchange successful. Redirecting to: ${siteUrl}${next}`);
-      // On successful exchange, redirect to the determined site URL + next path
-      return NextResponse.redirect(`${siteUrl}${next}`)
-    } else {
-       console.error(`OAuth Callback: Error exchanging code for session: ${error.message}`);
+      const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
+      const isLocalEnv = process.env.NODE_ENV === 'development'
+      if (isLocalEnv) {
+        // we can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
+        return NextResponse.redirect(`${origin}${next}`)
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      } else {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
     }
-  } else {
-     console.error("OAuth Callback: No 'code' parameter found in the request URL.");
   }
 
-  // If code exchange fails or no code is present, redirect to an error page
-  // Use the reliable siteUrl for the redirect base
-  console.log(`OAuth Callback: Failed. Redirecting to error page: ${siteUrl}/auth/error`);
-  return NextResponse.redirect(`${siteUrl}/auth/error`)
+  // return the user to an error page with instructions
+  return NextResponse.redirect(`${origin}/auth/error`)
 }
