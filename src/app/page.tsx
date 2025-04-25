@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button'; 
 
 export default async function Home() {
-  // const cookieStore = cookies(); // createClient handles cookies
-  const supabase = await createClient(); // Await the client creation
+  const supabase = await createClient();
 
   const { data: { session } } = await supabase.auth.getSession();
 
@@ -18,7 +17,6 @@ export default async function Home() {
           <Button asChild>
             <Link href="/inbox">Go to Inbox</Link>
           </Button>
-          {/* We might add a logout button here later */}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4">

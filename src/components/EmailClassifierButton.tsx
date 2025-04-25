@@ -37,9 +37,16 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedBucketIds, setSelectedBucketIds] = useState<Set<string>>(new Set());
 
+  // Determine if any unclassified emails exist
+  const hasUnclassified = allFetchedEmails.some(email => email.bucket_id === null);
+
   // Clear status message when dialog opens/closes
   useEffect(() => {
       setStatusMessage(null);
+      // Reset selection when dialog closes
+      if (!isDialogOpen) {
+          setSelectedBucketIds(new Set());
+      }
   }, [isDialogOpen]);
 
   const handleCheckboxChange = (bucketId: string, checked: boolean | string) => {
@@ -55,28 +62,25 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
   };
 
   const handleClassification = async () => {
-    if (selectedBucketIds.size === 0) {
-        setStatusMessage("Please select at least one bucket to re-classify.");
-        return;
-    }
-
-    // Filter emails based on selected buckets
-    const emailsToActuallyClassify = allFetchedEmails.filter(email => 
-        email.bucket_id && selectedBucketIds.has(email.bucket_id)
+    // Filter emails: include ALL unclassified ones PLUS those from selected buckets
+    const emailsToActuallyClassify = allFetchedEmails.filter(email =>
+        (email.bucket_id === null) || (email.bucket_id && selectedBucketIds.has(email.bucket_id))
     );
 
+    // Check if there are any emails to classify *after* filtering
     if (emailsToActuallyClassify.length === 0) {
-        setStatusMessage("No emails found in the selected buckets to re-classify.");
+        setStatusMessage("No emails matching the criteria (unclassified or in selected buckets).");
         return;
     }
-    
+
     if (availableBuckets.length === 0) {
-        setStatusMessage("Cannot classify: No buckets available."); // Should not happen if dialog opened
+        setStatusMessage("Cannot classify: No buckets available.");
         return;
     }
 
     setIsLoading(true);
-    setStatusMessage(`Starting classification for ${emailsToActuallyClassify.length} emails from selected buckets...`);
+    // Simplified initial status message
+    setStatusMessage(`Starting classification for ${emailsToActuallyClassify.length} emails...`);
 
     try {
       // 1. Call the classification API
@@ -89,7 +93,7 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
             preview: e.preview
         })),
         // Pass all available buckets including description
-        buckets: availableBuckets, 
+        buckets: availableBuckets,
       };
 
       const response = await fetch('/api/core/classify', {
@@ -101,7 +105,7 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({})); 
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(`API Error (${response.status}): ${errorData.error || response.statusText}`);
       }
 
@@ -111,8 +115,10 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
       console.log("Classification API Result:", result);
       if (classificationErrors && classificationErrors.length > 0) {
           console.warn("Classification API reported errors:", classificationErrors);
-          // Update status message to indicate partial success/errors
           setStatusMessage(`Classification finished with some errors. Check console. Processing successful updates...`);
+      } else {
+          // Clear status if no errors and proceeding
+          setStatusMessage("Processing successful classifications...");
       }
 
       // 2. Prepare DB Updates
@@ -125,13 +131,11 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
           }
       } else {
           console.log("No successful classifications returned from API.");
-          // Update status message based on whether there were errors or just no changes
-          setStatusMessage(classificationErrors?.length > 0 
+          setStatusMessage(classificationErrors?.length > 0
             ? "Classification finished with errors and no successful updates."
             : "Classification ran, but no emails were assigned new buckets.");
-          // Don't close dialog immediately if only errors occurred
           setIsLoading(false);
-          return; 
+          return;
       }
 
       if (dbUpdates.length === 0) {
@@ -156,7 +160,6 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
       }
 
       console.log(`Successfully updated ${dbUpdates.length} emails.`);
-      // Adjust message based on whether there were also API errors
       setStatusMessage(classificationErrors?.length > 0
          ? `Partial success! ${dbUpdates.length} emails updated, but some errors occurred (see console).`
          : `Classification complete! ${dbUpdates.length} emails updated.`
@@ -165,42 +168,50 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
       // 4. Refresh Server Component Data & Close Dialog on Success
       startTransition(() => {
         router.refresh();
-        setIsDialogOpen(false); // Close dialog after refresh starts
-        setSelectedBucketIds(new Set()); // Reset selection
+        // Don't close immediately, let user see the final message
+        // setIsDialogOpen(false); 
+        // setSelectedBucketIds(new Set()); // Reset happens in useEffect
       });
+      // Add a slight delay before closing to show the success message
+      setTimeout(() => {
+          setIsDialogOpen(false);
+      }, 2000); // Close after 2 seconds
 
     } catch (error) {
       console.error("Classification process failed:", error);
       setStatusMessage(`Error: ${error instanceof Error ? error.message : 'An unknown error occurred'}`);
-      // Keep dialog open on error
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Determine if the main action button should be enabled
+  const canStartClassification = hasUnclassified || selectedBucketIds.size > 0;
+
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-         {/* Update button text */}
-        <Button 
-           variant="outline" 
-           disabled={allFetchedEmails.length === 0} // Disable if no emails loaded
+        <Button
+           variant="outline"
+           // Disable if no emails loaded at all
+           disabled={allFetchedEmails.length === 0}
         >
-            Re-classify Emails...
+            Classify Emails...
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Re-classify Email Buckets</DialogTitle>
+          <DialogTitle>Classify Email Buckets</DialogTitle>
+          {/* Simplified Description */}
           <DialogDescription>
-            Select the buckets whose emails you want to re-classify using the LLM. 
-            All emails currently displayed within the selected buckets will be processed.
+             All currently unclassified emails will be included automatically.
+             Optionally select existing buckets below to include their emails in the classification run as well.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
            {/* Checkbox list for buckets */}
            <div className="space-y-2">
-                <Label>Select Buckets to Re-classify:</Label>
+                <Label>Optionally Include Emails from Buckets:</Label>
                 {availableBuckets.length > 0 ? (
                     availableBuckets.map((bucket) => (
                         <div key={bucket.id} className="flex items-center space-x-2">
@@ -228,13 +239,15 @@ export function EmailClassifierButton({ allFetchedEmails, availableBuckets, user
                   Cancel
                </Button>
             </DialogClose>
-          <Button 
-            type="button" 
-            onClick={handleClassification} 
-            disabled={isLoading || isPending || selectedBucketIds.size === 0}
+          <Button
+            type="button"
+            onClick={handleClassification}
+            // Simplified disabled logic
+            disabled={isLoading || isPending || !canStartClassification}
             aria-live="polite"
            >
-            {isLoading ? 'Classifying...' : isPending ? 'Refreshing...' : `Start Classification (${selectedBucketIds.size} selected)`}
+            {/* Simplified button text */}
+            {isLoading ? 'Classifying...' : isPending ? 'Refreshing...' : 'Start Classification'}
           </Button>
         </DialogFooter>
       </DialogContent>
