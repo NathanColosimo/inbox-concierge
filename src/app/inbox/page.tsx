@@ -6,6 +6,7 @@ import { prepareSyncActions } from '@/lib/sync/sync';
 import { fetchGmailEmails, type GmailApiEmailData } from '@/lib/sync/emails';
 import { EmailClassifierButton } from '@/components/EmailClassifierButton';
 import { BucketManager } from '@/components/BucketManager';
+import { InitialClassifier } from '@/components/InitialClassifier';
 
 // Define types using Supabase generated types
 type Bucket = Tables<"buckets">;
@@ -77,6 +78,7 @@ export default async function InboxPage() {
   let finalEmailsForDisplay: Email[] = [];
   let allLatestGmailThreadIds: string[] = []; // Keep track of IDs fetched from Gmail
   let gmailApiEmails: GmailApiEmailData[] = []; // Declare outside the try block
+  let unclassifiedEmailIdsForClient: string[] = []; // IDs for InitialClassifier
 
   // --- Data Fetching and Syncing ---
   try {
@@ -93,8 +95,9 @@ export default async function InboxPage() {
 
       if (fetchedBuckets.length === 0) {
         console.log("No buckets found, creating defaults...");
-        const defaultNames = ["Important", "Can wait", "Newsletter"];
-        const defaultBucketsToInsert = defaultNames.map(name => ({ user_id: userId, name: name }));
+        // Use a more descriptive set of default buckets
+        const defaultNames = ["Urgent & Important", "Read Later", "News & Subscriptions", "Marketing & Offers", "Notifications", "Receipts", "Other"];
+        const defaultBucketsToInsert = defaultNames.map(name => ({ user_id: userId, name: name, description: null })); // Add null description explicitly
         const { data: insertedBucketsData, error: insertBucketsError } = await supabase
           .from('buckets')
           .insert(defaultBucketsToInsert)
@@ -113,7 +116,7 @@ export default async function InboxPage() {
     // --- Step 2: Fetch Latest Emails Directly from Gmail ---
     console.log("Step 2: Fetching latest emails directly from Gmail...");
     try {
-      gmailApiEmails = await fetchGmailEmails(supabase, 50); // Assign to the outer variable
+      gmailApiEmails = await fetchGmailEmails(supabase, 100); // Assign to the outer variable
       console.log(`Fetched ${gmailApiEmails.length} email threads from Gmail API.`);
       allLatestGmailThreadIds = gmailApiEmails.map(g => g.threadId); // Store fetched IDs
     } catch (fetchError) {
@@ -170,14 +173,13 @@ export default async function InboxPage() {
         }
 
         // --- Step 6: Fetch Final Email List for Display ---
-        console.log("Step 6: Fetching final email list for display...");
+        console.log("Step 6: Fetching final email list for display (up to 200 latest synced)...");
         const { data: finalEmailsData, error: fetchFinalError } = await supabase
             .from('emails')
             .select(`*, buckets ( name )`) // Select all email fields and bucket name
             .eq('user_id', userId)
-            .in('id', allLatestGmailThreadIds) // Filter by the latest Gmail threads
             .order('email_date', { ascending: false, nullsFirst: false })
-            .limit(200); // Safety limit
+            .limit(200); // Fetch the latest 200 emails overall from the DB for this user
 
         if (fetchFinalError) {
             console.error("Error fetching final emails for display:", fetchFinalError);
@@ -186,6 +188,12 @@ export default async function InboxPage() {
         // Cast needed due to the join with buckets
         finalEmailsForDisplay = (finalEmailsData as unknown as Email[]) || [];
         console.log(`Fetched ${finalEmailsForDisplay.length} emails from Supabase to display.`);
+
+        // Identify unclassified email IDs for the client component
+        unclassifiedEmailIdsForClient = finalEmailsForDisplay
+            .filter(email => email.bucket_id === null)
+            .map(email => email.id);
+        console.log(`Identified ${unclassifiedEmailIdsForClient.length} unclassified email IDs for initial classification.`);
 
     } else if (!pageError && allLatestGmailThreadIds.length === 0) {
         console.log("Step 6: Skipped final fetch as no emails were retrieved from Gmail.");
@@ -205,10 +213,10 @@ export default async function InboxPage() {
   }
 
   // --- Prepare Data for Client Component ---
-  console.log("--- Preparing data for classification button ---");
+  console.log("--- Preparing data for classification button and initial classifier ---");
 
-  // Map *all* fetched emails to the format needed by the button/dialog
-  const allEmailsForButton = finalEmailsForDisplay.map(email => ({
+  // Map *all* fetched emails to the format needed by the button/dialog AND InitialClassifier
+  const allEmailsForClientComponents = finalEmailsForDisplay.map(email => ({
       id: email.id,
       subject: email.subject,
       sender: email.sender,
@@ -224,8 +232,24 @@ export default async function InboxPage() {
       description: b.description
   }));
 
-  console.log(`Passing ${allEmailsForButton.length} total fetched emails to the classification dialog trigger.`);
+  console.log(`Passing ${allEmailsForClientComponents.length} total fetched emails to client components.`);
+  console.log(`Passing ${unclassifiedEmailIdsForClient.length} unclassified IDs to InitialClassifier.`);
   console.log(`Passing ${availableBucketsMapped.length} buckets to manager/classifier.`);
+
+  // --- Debugging: Inspect data before rendering ---
+  console.log(`DEBUG: Total finalEmailsForDisplay count: ${finalEmailsForDisplay.length}`);
+  const classifiedCount = finalEmailsForDisplay.filter(e => e.bucket_id !== null).length;
+  const unclassifiedCount = finalEmailsForDisplay.filter(e => e.bucket_id === null).length;
+  console.log(`DEBUG: Classified count: ${classifiedCount}, Unclassified count: ${unclassifiedCount}`);
+  const emailBucketIds = new Set(finalEmailsForDisplay.map(e => e.bucket_id).filter(id => id !== null));
+  const fetchedBucketIds = new Set(fetchedBuckets.map(b => b.id));
+  console.log('DEBUG: Bucket IDs ON emails:', Array.from(emailBucketIds));
+  console.log('DEBUG: Bucket IDs IN fetchedBuckets:', Array.from(fetchedBucketIds));
+  const missingBucketIds = Array.from(emailBucketIds).filter(id => !fetchedBucketIds.has(id));
+  if (missingBucketIds.length > 0) {
+      console.warn(`DEBUG: Emails have bucket IDs that are NOT in fetchedBuckets:`, missingBucketIds);
+  }
+  // --- End Debugging ---
 
   // --- Rendering ---
   console.log("--- Rendering Inbox Page ----");
@@ -251,9 +275,17 @@ export default async function InboxPage() {
           <div className="lg:col-span-3 space-y-8">
               {/* Add the classification button/dialog trigger here */}
               <EmailClassifierButton
-                  allFetchedEmails={allEmailsForButton}
+                  allFetchedEmails={allEmailsForClientComponents} // Pass mapped emails
                   availableBuckets={availableBucketsMapped} // Pass mapped buckets
                   userId={userId}
+              />
+
+              {/* Add the Initial Classifier component here */}
+              <InitialClassifier
+                   unclassifiedEmailIds={unclassifiedEmailIdsForClient}
+                   allEmailsData={allEmailsForClientComponents} // Pass the same full data
+                   availableBuckets={availableBucketsMapped}
+                   userId={userId}
               />
 
               {/* Display Page Error */}
@@ -276,10 +308,10 @@ export default async function InboxPage() {
 
               {/* Render Buckets and Emails */}
               {!pageError && fetchedBuckets.map((bucket) => {
-                // Don't render the "Uncategorized" bucket heading here, handle it separately
-                if (bucket.name === "Uncategorized") return null;
-
                 const emailsInBucket = finalEmailsForDisplay.filter(email => email.bucket_id === bucket.id);
+                // Add log here to see count per bucket
+                console.log(`DEBUG: Rendering bucket '${bucket.name}' (ID: ${bucket.id}) - Emails in this bucket: ${emailsInBucket.length}`);
+
                 // Only render the heading if there are emails *in this specific bucket*
                 if (emailsInBucket.length === 0) return null;
 
@@ -290,22 +322,6 @@ export default async function InboxPage() {
                   </div>
                 );
               })}
-
-              {/* Section for Uncategorized emails */}
-              {!pageError && (
-                  (() => {
-                      const unclassifiedEmails = finalEmailsForDisplay.filter(email => email.bucket_id === null);
-                      if (unclassifiedEmails.length > 0) {
-                          return (
-                              <div>
-                                  <h2 className="text-xl font-semibold mb-3 border-b pb-1 dark:border-gray-600">Uncategorized</h2>
-                                  <EmailList emails={unclassifiedEmails} />
-                              </div>
-                          );
-                      }
-                      return null; // Don't render heading if no unclassified emails
-                  })()
-              )}
           </div>
       </div>
     </div>

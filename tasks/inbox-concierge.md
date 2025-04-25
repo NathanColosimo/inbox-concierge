@@ -32,7 +32,7 @@ Create a web application demonstrating engineering skills. The app will authenti
 
 **Phase 2: Gmail Integration & Initial Display**
 
-*   [x] Create Backend API Route (`/api/emails/fetch`)
+*   [x] Create Backend API Function (`/lib/sync/emails.ts`)
     *   [x] Get authenticated user & Google token from Supabase session
     *   [x] Initialize Gmail API client
     *   [x] Fetch recent thread IDs (`gmail.users.threads.list`)
@@ -40,7 +40,7 @@ Create a web application demonstrating engineering skills. The app will authenti
     *   [x] Return thread list (Subject, Preview, Sender, ID) as JSON
     *   [x] Handle API errors
 *   [x] Develop Frontend Display
-    *   [x] Fetch data from `/api/emails/fetch` on authenticated page load
+    *   [x] Fetch gmail data from on authenticated page load
     *   [x] Implement loading state
     *   [x] Display fetched emails (initially with `bucket_id = null`)
 

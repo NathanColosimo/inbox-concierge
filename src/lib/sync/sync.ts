@@ -1,6 +1,5 @@
 import type { Tables, TablesInsert } from '@/lib/database.types';
 
-// Re-define or import the type expected from the /api/emails/fetch route
 // Assuming it matches this structure based on the API route code
 export interface GmailApiEmailData {
     id: string; // This is the message ID (less relevant now, but part of the API response)
@@ -25,7 +24,7 @@ interface SyncActions {
  * and prepares a list of new emails to be inserted.
  * Assumes the 'id' column in the Supabase 'emails' table stores the Gmail thread ID.
  *
- * @param gmailEmails - Array of email data fetched from the /api/emails/fetch endpoint.
+ * @param gmailEmails - Array of email data fetched from the.
  * @param supabaseEmails - Array of existing email objects from Supabase (only needs 'id').
  * @param userId - The ID of the current user.
  * @returns An object containing emails to insert and lists of thread IDs.

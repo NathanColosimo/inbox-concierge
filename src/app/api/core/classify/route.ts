@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 
 // --- Configuration ---
 const BATCH_SIZE = 10; // Process emails in batches of 10
+const DELAY_BETWEEN_REQUESTS_MS = 300; // Wait 300ms between starting new requests
 
 // --- Input Validation ---
 // Accept full bucket objects now
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
     // --- Call LLM with generateObject and Validate ---
     try {
       const { object: rawResults } = await generateObject({
-        model: openrouter('openai/gpt-4.1-nano'), // Using specified model
+        model: openrouter('google/gemini-2.5-flash-preview'), // Using specified model
         output: 'array', // Specify array output
         schema: singleClassificationSchema, // Schema for *each element*
         system: systemPrompt,
@@ -206,7 +207,7 @@ export async function POST(request: Request) {
     }
 
     // Add a 1-second delay at the end of the batch processing loop
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS_MS));
   } // End of batch loop
 
   // 5. Return Aggregated Results
