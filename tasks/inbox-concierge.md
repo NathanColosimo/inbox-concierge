@@ -49,25 +49,25 @@ Create a web application demonstrating engineering skills. The app will authenti
 *   [x] Set up Vercel AI SDK & LLM Provider API Key (Environment Variable)
 *   [x] Define Default Buckets (Hardcoded list)
 *   [x] Create Classification API Route (`/api/core/classify`)
-    *   [x] Accept email data and bucket list
+    *   [x] Accept email data and bucket list (Updated to use bucket {id, name})
     *   [x] Design LLM prompt for classification
     *   [x] Use Vercel AI SDK (`generateObject`) to classify emails
     *   [x] Parse LLM responses
-    *   [x] Return emails with assigned bucket names
-*   [ ] Integrate Classification into Frontend
-    *   [ ] Call `/api/core/classify` after fetching emails
-    *   [ ] Update UI state to group emails by bucket (Update DB based on API response)
-    *   [ ] Render emails grouped under bucket headings (Existing logic should work post-DB update)
+    *   [x] Return emails with assigned bucket names (Updated to return bucket IDs)
+*   [x] Integrate Classification into Frontend
+    *   [x] User triggers classification via button/dialog (Changed from automatic on load)
+    *   [x] Update emails in DB via client-side call after API response
+    *   [x] Refresh server component data to show updated buckets
 
 **Phase 4: Custom Buckets & Re-classification**
 
-*   [ ] Implement Custom Bucket Management API Routes
-    *   [ ] `POST /api/buckets` (Create new bucket in DB)
-    *   [ ] `GET /api/buckets` (Fetch user's buckets from DB)
-*   [ ] Develop Custom Bucket UI
-    *   [ ] Input field/button to create new buckets
-    *   [ ] Call `POST /api/buckets` on submit
-    *   [ ] Display list of custom buckets (fetch via `GET /api/buckets`)
+*   [-] Implement Custom Bucket Management API Routes (Superseded by client-side component)
+    *   [-] `POST /api/buckets` (Create new bucket in DB) - Handled by client component
+    *   [-] `GET /api/buckets` (Fetch user's buckets from DB) - Handled by initial server load + refresh
+*   [x] Develop Custom Bucket UI (Client Component: `BucketManager`)
+    *   [x] Inline form for create/edit (name, description)
+    *   [x] Client-side Supabase calls for create/update
+    *   [x] Display list of custom buckets with edit capability (Inline Edit)
 *   [ ] Implement Re-classification Logic
     *   [ ] Trigger re-classification on new bucket creation
     *   [ ] Fetch updated bucket list
@@ -78,11 +78,6 @@ Create a web application demonstrating engineering skills. The app will authenti
 
 *   [ ] UI/UX Improvements (Loading states, error handling, styling, responsiveness)
 *   [ ] Code Quality (Typing, comments, structure)
-*   [ ] Deployment to Vercel
-    *   [ ] Connect GitHub repo
-    *   [ ] Configure Vercel Environment Variables (Supabase keys, Google keys, LLM key)
-    *   [ ] Ensure Vercel URL added to Google Cloud Console / Supabase config
-    *   [ ] Test deployment
 
 **Key Challenges:**
 

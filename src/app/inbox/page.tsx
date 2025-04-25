@@ -5,6 +5,7 @@ import type { Tables } from '@/lib/database.types';
 import { prepareSyncActions } from '@/lib/sync/sync';
 import { fetchGmailEmails, type GmailApiEmailData } from '@/lib/sync/emails';
 import { EmailClassifierButton } from '@/components/EmailClassifierButton';
+import { BucketManager } from '@/components/BucketManager';
 
 // Define types using Supabase generated types
 type Bucket = Tables<"buckets">;
@@ -213,17 +214,23 @@ export default async function InboxPage() {
 
   // Map *all* fetched emails to the format needed by the button/dialog
   const allEmailsForButton = finalEmailsForDisplay.map(email => ({
-      id: email.id, // This is the threadId
+      id: email.id,
       subject: email.subject,
       sender: email.sender,
       preview: email.preview,
       bucket_id: email.bucket_id,
   }));
 
-  // Map buckets to the format needed by the button
-  const availableBucketsForButton = fetchedBuckets.map(b => ({ id: b.id, name: b.name }));
+  // Map buckets to the format needed by the button AND the manager
+  // Include description now (it might be null from DB initially)
+  const availableBucketsMapped = fetchedBuckets.map(b => ({ 
+      id: b.id, 
+      name: b.name, 
+      description: b.description // Add description
+  }));
 
   console.log(`Passing ${allEmailsForButton.length} total fetched emails to the classification dialog trigger.`);
+  console.log(`Passing ${availableBucketsMapped.length} buckets to manager/classifier.`);
 
   // --- Rendering ---
   console.log("--- Rendering Inbox Page ----");
@@ -235,69 +242,76 @@ export default async function InboxPage() {
         <LogoutButton />
       </header>
 
-      {/* Add the classification button/dialog trigger here */}
-      <EmailClassifierButton
-          // Pass using the correct prop name expected by the component
-          allFetchedEmails={allEmailsForButton}
-          availableBuckets={availableBucketsForButton}
-          userId={userId}
-      />
+      {/* --- Main Content Area --- */}
+      <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* --- Left Column (Bucket Manager) --- */}
+          <div className="lg:col-span-1">
+              <BucketManager 
+                  initialBuckets={availableBucketsMapped}
+                  userId={userId}
+              />
+          </div>
 
-      {/* TODO: Add UI for creating custom buckets here */}
+          {/* --- Right Column (Classifier Button + Email List) --- */}
+          <div className="lg:col-span-3 space-y-8">
+              {/* Add the classification button/dialog trigger here */}
+              <EmailClassifierButton
+                  allFetchedEmails={allEmailsForButton}
+                  availableBuckets={availableBucketsMapped} // Pass mapped buckets
+                  userId={userId}
+              />
 
-      <div className="w-full max-w-4xl space-y-8">
-        {/* Display Page Error */}
-        {pageError && (
-            <p className="text-center text-red-500 px-4 py-3 rounded relative bg-red-100 border border-red-400">
-                Error loading page: {pageError}
-            </p>
-        )}
+              {/* Display Page Error */}
+              {pageError && (
+                  <p className="text-center text-red-500 px-4 py-3 rounded relative bg-red-100 border border-red-400">
+                      Error loading page: {pageError}
+                  </p>
+              )}
 
-        {/* Loading/Empty States */}
-        {!pageError && fetchedBuckets.length === 0 && finalEmailsForDisplay.length === 0 && (
-           <p className="text-center text-gray-500">Loading buckets and emails...</p>
-        )}
-        {!pageError && fetchedBuckets.length > 0 && finalEmailsForDisplay.length === 0 && allLatestGmailThreadIds.length === 0 && !gmailApiEmails.length && (
-             <p className="text-center text-gray-500">No emails found in Gmail or Supabase yet.</p>
-        )}
-         {!pageError && fetchedBuckets.length > 0 && finalEmailsForDisplay.length === 0 && allLatestGmailThreadIds.length > 0 && (
-             <p className="text-center text-gray-500">Fetched emails from Gmail, but none are available for display after sync. Check DB state or filters.</p>
-        )}
+              {/* Loading/Empty States */}
+              {!pageError && fetchedBuckets.length === 0 && finalEmailsForDisplay.length === 0 && (
+                 <p className="text-center text-gray-500">Loading buckets and emails...</p>
+              )}
+              {!pageError && fetchedBuckets.length > 0 && finalEmailsForDisplay.length === 0 && allLatestGmailThreadIds.length === 0 && !gmailApiEmails.length && (
+                   <p className="text-center text-gray-500">No emails found in Gmail or Supabase yet.</p>
+              )}
+               {!pageError && fetchedBuckets.length > 0 && finalEmailsForDisplay.length === 0 && allLatestGmailThreadIds.length > 0 && (
+                   <p className="text-center text-gray-500">Fetched emails from Gmail, but none are available for display after sync. Check DB state or filters.</p>
+              )}
 
+              {/* Render Buckets and Emails */}
+              {!pageError && fetchedBuckets.map((bucket) => {
+                // Don't render the "Uncategorized" bucket heading here, handle it separately
+                if (bucket.name === "Uncategorized") return null;
 
-        {/* Render Buckets and Emails */}
-        {!pageError && fetchedBuckets.map((bucket) => {
-          // Don't render the "Uncategorized" bucket heading here, handle it separately
-          if (bucket.name === "Uncategorized") return null;
+                const emailsInBucket = finalEmailsForDisplay.filter(email => email.bucket_id === bucket.id);
+                // Only render the heading if there are emails *in this specific bucket*
+                if (emailsInBucket.length === 0) return null;
 
-          const emailsInBucket = finalEmailsForDisplay.filter(email => email.bucket_id === bucket.id);
-          // Only render the heading if there are emails *in this specific bucket*
-          if (emailsInBucket.length === 0) return null;
+                return (
+                  <div key={bucket.id}>
+                    <h2 className="text-xl font-semibold mb-3 border-b pb-1 dark:border-gray-600">{bucket.name}</h2>
+                    <EmailList emails={emailsInBucket} />
+                  </div>
+                );
+              })}
 
-          return (
-            <div key={bucket.id}>
-              <h2 className="text-xl font-semibold mb-3 border-b pb-1 dark:border-gray-600">{bucket.name}</h2>
-              <EmailList emails={emailsInBucket} />
-            </div>
-          );
-        })}
-
-        {/* Section for Uncategorized emails */}
-        {!pageError && (
-            (() => {
-                const unclassifiedEmails = finalEmailsForDisplay.filter(email => email.bucket_id === unclassifiedBucketId || email.bucket_id === null);
-                if (unclassifiedEmails.length > 0) {
-                    return (
-                        <div>
-                            <h2 className="text-xl font-semibold mb-3 border-b pb-1 dark:border-gray-600">Uncategorized</h2>
-                            <EmailList emails={unclassifiedEmails} />
-                        </div>
-                    );
-                }
-                return null; // Don't render heading if no unclassified emails
-            })()
-        )}
-
+              {/* Section for Uncategorized emails */}
+              {!pageError && (
+                  (() => {
+                      const unclassifiedEmails = finalEmailsForDisplay.filter(email => email.bucket_id === unclassifiedBucketId || email.bucket_id === null);
+                      if (unclassifiedEmails.length > 0) {
+                          return (
+                              <div>
+                                  <h2 className="text-xl font-semibold mb-3 border-b pb-1 dark:border-gray-600">Uncategorized</h2>
+                                  <EmailList emails={unclassifiedEmails} />
+                              </div>
+                          );
+                      }
+                      return null; // Don't render heading if no unclassified emails
+                  })()
+              )}
+          </div>
       </div>
     </div>
   );
