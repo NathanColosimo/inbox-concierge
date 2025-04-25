@@ -1,9 +1,9 @@
 import type { Tables, TablesInsert } from '@/lib/database.types';
 
-// Assuming it matches this structure based on the API route code
+// Structure for data received from the Gmail API
 export interface GmailApiEmailData {
-    id: string; // This is the message ID (less relevant now, but part of the API response)
-    threadId: string; // This is the Gmail Thread ID we will store in our 'id' column
+    id: string; // Gmail Message ID
+    threadId: string; // Gmail Thread ID (used as our primary key 'id')
     subject: string;
     sender: string;
     preview: string;
@@ -35,7 +35,7 @@ export function prepareSyncActions(
     userId: string
 ): SyncActions {
 
-    const supabaseThreadIds = new Set(supabaseEmails.map(e => e.id)); // Use the 'id' field directly
+    const supabaseThreadIds = new Set(supabaseEmails.map(e => e.id)); 
     const allLatestGmailThreadIds = gmailEmails.map(g => g.threadId);
 
     const emailsToUpsert: TablesInsert<'emails'>[] = [];
@@ -45,19 +45,18 @@ export function prepareSyncActions(
         if (!supabaseThreadIds.has(gmailEmail.threadId)) {
             // This email thread is new, prepare it for insertion
             emailsToUpsert.push({
-                id: gmailEmail.threadId, // Set the table's primary key 'id' to the Gmail Thread ID
+                id: gmailEmail.threadId, // Use Gmail Thread ID as primary key
                 user_id: userId,
-                bucket_id: null, // Assign null for newly synced/uncategorized emails
+                bucket_id: null, // New emails are unclassified
                 subject: gmailEmail.subject,
                 sender: gmailEmail.sender,
                 preview: gmailEmail.preview,
                 // IMPORTANT: Ensure your DB expects ISO 8601 format or adjust parsing
                 email_date: gmailEmail.date ? new Date(gmailEmail.date).toISOString() : null,
-                last_fetched_at: new Date().toISOString(), // Mark when it was last synced
-                // No gmail_thread_id or gmail_message_id needed anymore
+                last_fetched_at: new Date().toISOString(), // Record sync time
             });
         } else {
-            // This email thread already exists in Supabase
+            // Email thread already exists in Supabase, track its ID
             existingGmailThreadIdsInLatestFetch.push(gmailEmail.threadId);
         }
     }

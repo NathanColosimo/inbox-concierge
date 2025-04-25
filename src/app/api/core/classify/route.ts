@@ -186,14 +186,15 @@ export async function POST(request: Request) {
               } else {
                   // This case should ideally not happen due to validation, but good to handle
                   console.warn(`Validation passed, but could not find bucket ID for name '${bucketName}' (Thread ID: ${threadId}). Skipping.`);
-                   // Optionally add to errors array if this should be treated as an error
-                   // errors.push({ batchThreadIds: [threadId], error: `Internal Error: Could not map validated bucket name '${bucketName}' back to an ID.` });
               }
           });
       } else {
           console.error(`Batch validation failed for IDs ${batchThreadIds.join(', ')}: ${validationError}`);
           errors.push({ batchThreadIds, error: `Validation Failed: ${validationError}` });
       }
+      // ** End of Manual Validation Block **
+      // Explicit checks (array length, unique/matching IDs, valid buckets) ensure
+      // the LLM output strictly adheres to the batch requirements beyond basic schema types.
 
     } catch (error) {
         // Handle potential NoObjectGeneratedError specifically

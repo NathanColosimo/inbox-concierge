@@ -35,10 +35,11 @@ function EmailList({ emails }: { emails: Email[] }) {
     <ul className="space-y-4">
       {emails.map((email) => {
         const emailWithBucket = email as EmailWithBucket;
-        const bucketName = emailWithBucket.buckets?.name || 'Uncategorized'; // Access joined bucket name
+        // Use the bucket name from the joined data, default if null
+        const bucketName = emailWithBucket.buckets?.name || 'Uncategorized'; 
 
         return (
-          // Use the email's id (which is the Gmail Thread ID) for the React key
+          // Use the email's id (Gmail Thread ID) for the React key
           <li key={email.id} className="border rounded-md p-4 shadow-sm dark:border-gray-700">
             <div className="flex justify-between items-start mb-1">
                 <p className="font-semibold text-lg">{email.subject || "No Subject"}</p>
@@ -97,7 +98,7 @@ export default async function InboxPage() {
         console.log("No buckets found, creating defaults...");
         // Use a more descriptive set of default buckets
         const defaultNames = ["Urgent & Important", "Read Later", "News & Subscriptions", "Marketing & Offers", "Notifications", "Receipts", "Other"];
-        const defaultBucketsToInsert = defaultNames.map(name => ({ user_id: userId, name: name, description: null })); // Add null description explicitly
+        const defaultBucketsToInsert = defaultNames.map(name => ({ user_id: userId, name: name, description: null })); 
         const { data: insertedBucketsData, error: insertBucketsError } = await supabase
           .from('buckets')
           .insert(defaultBucketsToInsert)
@@ -156,7 +157,7 @@ export default async function InboxPage() {
         // --- Step 5: Upsert Email Threads ---
         if (emailsToUpsert.length > 0) {
             console.log(`Step 5: Upserting ${emailsToUpsert.length} email threads...`);
-            // Optional: Add detailed debug logging here if needed
+            // Upsert ensures new emails are inserted and potentially allows updating existing ones later if needed
             const { error: upsertError } = await supabase
             .from('emails')
             .upsert(emailsToUpsert, { onConflict: 'id' });
@@ -185,7 +186,7 @@ export default async function InboxPage() {
             console.error("Error fetching final emails for display:", fetchFinalError);
             throw new Error(`Failed to fetch emails for display: ${fetchFinalError.message}`); // Make this fatal
         }
-        // Cast needed due to the join with buckets
+        // Assign fetched data, ensuring it's an array
         finalEmailsForDisplay = (finalEmailsData as unknown as Email[]) || [];
         console.log(`Fetched ${finalEmailsForDisplay.length} emails from Supabase to display.`);
 
@@ -309,10 +310,7 @@ export default async function InboxPage() {
               {/* Render Buckets and Emails */}
               {!pageError && fetchedBuckets.map((bucket) => {
                 const emailsInBucket = finalEmailsForDisplay.filter(email => email.bucket_id === bucket.id);
-                // Add log here to see count per bucket
-                console.log(`DEBUG: Rendering bucket '${bucket.name}' (ID: ${bucket.id}) - Emails in this bucket: ${emailsInBucket.length}`);
-
-                // Only render the heading if there are emails *in this specific bucket*
+                // Only render the bucket section if it contains emails
                 if (emailsInBucket.length === 0) return null;
 
                 return (
