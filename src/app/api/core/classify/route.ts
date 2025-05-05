@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 // --- Configuration ---
 const BATCH_SIZE = 10; // Process emails in batches of 10
-const RATE_PER_SECOND = 4; // Max batches to START per second
+const RATE_PER_SECOND = 9; // Max batches to START per second
 const RATE_LIMIT_DELAY_BUFFER_MS = 100; // Small buffer for the 1-second window
 
 // --- Input Validation ---
