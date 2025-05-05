@@ -1,14 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { User } from '@supabase/supabase-js';
 
-interface UpdateSessionResult {
-  response: NextResponse;
-  user: User | null;
-}
-
-export async function updateSession(request: NextRequest): Promise<UpdateSessionResult> {
-  let response = NextResponse.next({
+export async function updateSession(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
     request,
   })
 
@@ -22,11 +16,11 @@ export async function updateSession(request: NextRequest): Promise<UpdateSession
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({
+          supabaseResponse = NextResponse.next({
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options)
           )
         },
       },
@@ -46,21 +40,20 @@ export async function updateSession(request: NextRequest): Promise<UpdateSession
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth') &&
-    ['/inbox'].some(path => request.nextUrl.pathname.startsWith(path))
+    !request.nextUrl.pathname.startsWith('/auth')
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
-    return { response: NextResponse.redirect(url), user: null }
+    return NextResponse.redirect(url)
   }
 
-  // IMPORTANT: You *must* return the response object as it is.
+  // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:
   //    const myNewResponse = NextResponse.next({ request })
   // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(response.cookies.getAll())
+  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
   // 3. Change the myNewResponse object to fit your needs, but avoid changing
   //    the cookies!
   // 4. Finally:
@@ -68,5 +61,5 @@ export async function updateSession(request: NextRequest): Promise<UpdateSession
   // If this is not done, you may be causing the browser and server to go out
   // of sync and terminate the user's session prematurely!
 
-  return { response, user }
+  return supabaseResponse
 }

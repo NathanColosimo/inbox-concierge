@@ -1,33 +1,41 @@
 import { updateSession } from '@/lib/supabase/middleware'
 import { type NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function middleware(request: NextRequest) {
-  // Update the session and get the response and user object
-  const { response, user } = await updateSession(request)
+  // First, update the session cookie
+  const response = await updateSession(request)
 
-  // Use the user object returned from updateSession for logic
-  const session = user // Use 'user' directly for checks
+  // Create a Supabase client to check auth status
+  // NOTE: Using createClient() here might re-read cookies that updateSession just set.
+  // This is a common pattern, though slightly redundant. Alternatively, 
+  // the logic could be combined if updateSession exposed the session.
+  const supabase = await createClient()
+
+  // Check if user is authenticated
+  const { data: { session } } = await supabase.auth.getSession()
+
   const { pathname } = request.nextUrl
 
-  // Define protected routes (can be simplified if updateSession handles it)
-  // const protectedRoutes = ['/inbox'] 
+  // Define protected routes
+  const protectedRoutes = ['/inbox'] // Add any other routes that need auth
 
-  // updateSession already handles redirecting unauthenticated users from protected routes
-  // if (!session && protectedRoutes.some(path => pathname.startsWith(path))) { ... }
+  // If user is not logged in and trying to access a protected route
+  if (!session && protectedRoutes.some(path => pathname.startsWith(path))) {
+    // Redirect to login page
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    return NextResponse.redirect(url)
+  }
 
   // If user is logged in and trying to access login page, redirect to inbox
   if (session && pathname === '/auth/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/inbox'
-    // Important: Preserve cookies from the updateSession response in this new redirect response
-    const redirectResponse = NextResponse.redirect(url)
-    response.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
-    })
-    return redirectResponse
+    return NextResponse.redirect(url)
   }
 
-  // Otherwise, continue with the response from updateSession (which has updated cookies)
+  // Otherwise, continue with the response from updateSession
   return response
 }
 
